@@ -1,14 +1,31 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
+	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
+	"time"
+
+	"github.com/Cmolloy36/Chirpy/internal/database"
+	"github.com/google/uuid"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 func main() {
+	godotenv.Load()
+
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		fmt.Println(fmt.Errorf("error: %w", err))
+	}
+
+	dbQueries := database.New(db)
+
 	newServeMux := &http.ServeMux{}
 
 	newHttpServer := http.Server{
@@ -17,6 +34,9 @@ func main() {
 	}
 
 	apiCfg := apiConfig{}
+	apiCfg.platform = os.Getenv("PLATFORM")
+	apiCfg.fileserverHits.Store(0)
+	apiCfg.dbQueries = dbQueries
 
 	funcHandler := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
 
@@ -24,7 +44,9 @@ func main() {
 
 	newServeMux.HandleFunc("GET /api/healthz", handler)
 
-	newServeMux.HandleFunc("POST /api/validate_chirp", handlerJSON)
+	newServeMux.HandleFunc("POST /api/validate_chirp", handlerCleanJSON)
+
+	newServeMux.HandleFunc("POST /api/users", apiCfg.handlerUsers)
 
 	newServeMux.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
 
@@ -35,78 +57,22 @@ func main() {
 }
 
 type apiConfig struct {
+	platform       string
 	fileserverHits atomic.Int32 // allows us to safely increment & read across multiple goroutines
+	dbQueries      *database.Queries
+}
+
+type User struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
-}
-
-func handlerJSON(w http.ResponseWriter, r *http.Request) {
-	type inputJSON struct {
-		Body string `json:"body"`
-	}
-
-	type errStruct struct {
-		ErrorMessage string `json:"error"`
-	}
-
-	type validStruct struct {
-		Validity bool `json:"valid"`
-	}
-
-	var inputData inputJSON
-
-	decoder := json.NewDecoder(r.Body)
-
-	defer r.Body.Close()
-
-	if err := decoder.Decode(&inputData); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		errorStruct := errStruct{
-			ErrorMessage: "Something went wrong",
-		}
-
-		dat, err := json.Marshal(errorStruct)
-		if err != nil {
-			log.Printf("Error marshalling JSON: %s", err)
-			return
-		}
-		w.Write(dat)
-		return
-	}
-
-	if len(inputData.Body) > 140 {
-		w.WriteHeader(400)
-		errorStruct := errStruct{
-			ErrorMessage: "Chirp is too long",
-		}
-
-		dat, err := json.Marshal(errorStruct)
-		if err != nil {
-			log.Printf("Error marshalling JSON: %s", err)
-			return
-		}
-		w.Write(dat)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-
-	ret := validStruct{
-		Validity: true,
-	}
-
-	dat, err := json.Marshal(ret)
-	if err != nil {
-		log.Printf("Error marshalling JSON: %s", err)
-		return
-	}
-
-	w.Write(dat)
 }
 
 func (apiCfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
@@ -120,8 +86,16 @@ func (apiCfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (apiCfg *apiConfig) resetHandler(w http.ResponseWriter, r *http.Request) {
-	apiCfg.fileserverHits.Store(0)
-	w.Write([]byte("Hits: 0"))
+	// apiCfg.fileserverHits.Store(0)
+	// w.Write([]byte("Hits: 0"))
+
+	if apiCfg.platform != "dev" {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	apiCfg.dbQueries.ResetUsers(context.Background())
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
