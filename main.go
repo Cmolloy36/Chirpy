@@ -44,9 +44,15 @@ func main() {
 
 	newServeMux.HandleFunc("GET /api/healthz", handler)
 
-	newServeMux.HandleFunc("POST /api/validate_chirp", handlerCleanJSON)
+	newServeMux.HandleFunc("POST /api/chirps", apiCfg.handlerPostChirp)
 
-	newServeMux.HandleFunc("POST /api/users", apiCfg.handlerUsers)
+	newServeMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerGetChirp)
+
+	newServeMux.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps)
+
+	newServeMux.HandleFunc("POST /api/users", apiCfg.handlerPostUser)
+
+	newServeMux.HandleFunc("GET /api/users/{userID}", apiCfg.handlerGetUser)
 
 	newServeMux.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
 
@@ -67,6 +73,14 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
+}
+
+type Chirp struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserID    uuid.UUID `json:"user_id"`
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {

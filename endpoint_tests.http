@@ -74,9 +74,20 @@ post http://localhost:8080/api/users
 Content-Type: application/json
 
 {
-    "email": "cooper@example.com"
+    "email": "saul@bettercall.com"
 }
 
 ###
 
 post http://localhost:8080/admin/reset
+
+
+###
+
+post http://localhost:8080/api/chirps
+Content-Type: application/json
+
+{
+    "body": "This is a chirp",
+    "user_id": "7cc32efe-4af8-45af-b6c6-fb793c9722b7"
+}

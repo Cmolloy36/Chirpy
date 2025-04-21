@@ -12,5 +12,5 @@ RETURNING *;
 DELETE FROM users;
 
 -- name: GetUser :one
-SELECT * from users
+SELECT * FROM users
 WHERE email = $1;
