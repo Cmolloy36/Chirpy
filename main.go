@@ -50,6 +50,8 @@ func main() {
 
 	newServeMux.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps)
 
+	newServeMux.HandleFunc("POST /api/login", apiCfg.handlerLogin)
+
 	newServeMux.HandleFunc("POST /api/users", apiCfg.handlerPostUser)
 
 	newServeMux.HandleFunc("GET /api/users/{userID}", apiCfg.handlerGetUser)
