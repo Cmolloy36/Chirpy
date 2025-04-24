@@ -111,3 +111,7 @@ func TestInvalidSecret2(t *testing.T) {
 
 	assert.Error(t, err)
 }
+
+func TestGetAuthHeader(t *testing.T) {
+
+}

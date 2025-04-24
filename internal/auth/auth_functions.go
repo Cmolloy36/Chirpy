@@ -3,6 +3,8 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -12,6 +14,8 @@ import (
 
 var ErrHashMismatch = errors.New("hash and password do not match")
 var ErrTokenSigning = errors.New("error signing token")
+var ErrNoAuthHeader = errors.New("no authorization header provided")
+var ErrUnauthorized = errors.New("user not authorized")
 
 func HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -84,4 +88,16 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	}
 
 	return idUUID, nil
+}
+
+func GetBearerToken(headers http.Header) (string, error) {
+	authHeader := headers.Get("Authorization")
+	if authHeader == "" {
+		return "", ErrNoAuthHeader
+	}
+
+	splitString := strings.Split(authHeader, "Bearer ")
+	TOKEN_STRING := splitString
+
+	return TOKEN_STRING[1], nil
 }

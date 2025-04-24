@@ -37,6 +37,7 @@ func main() {
 	apiCfg.platform = os.Getenv("PLATFORM")
 	apiCfg.fileserverHits.Store(0)
 	apiCfg.dbQueries = dbQueries
+	apiCfg.secretString = os.Getenv("SIGNING_SECRET")
 
 	funcHandler := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
 
@@ -68,6 +69,7 @@ type apiConfig struct {
 	platform       string
 	fileserverHits atomic.Int32 // allows us to safely increment & read across multiple goroutines
 	dbQueries      *database.Queries
+	secretString   string
 }
 
 type User struct {
@@ -75,6 +77,7 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
+	Token     string    `json:"token"`
 }
 
 type Chirp struct {

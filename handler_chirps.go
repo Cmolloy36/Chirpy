@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Cmolloy36/Chirpy/internal/auth"
 	"github.com/Cmolloy36/Chirpy/internal/database"
 	"github.com/google/uuid"
 )
 
 func (apiCfg *apiConfig) handlerPostChirp(w http.ResponseWriter, r *http.Request) {
 	type inputJSON struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	var inputData inputJSON
@@ -24,6 +24,22 @@ func (apiCfg *apiConfig) handlerPostChirp(w http.ResponseWriter, r *http.Request
 
 	if err := decoder.Decode(&inputData); err != nil {
 		errorMessage := "Something went wrong"
+
+		respondWithError(w, http.StatusBadRequest, errorMessage)
+		return
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		errorMessage := err.Error()
+
+		respondWithError(w, http.StatusBadRequest, errorMessage)
+		return
+	}
+
+	validatedUserID, err := auth.ValidateJWT(token, apiCfg.secretString)
+	if err != nil {
+		errorMessage := err.Error()
 
 		respondWithError(w, http.StatusBadRequest, errorMessage)
 		return
@@ -41,7 +57,7 @@ func (apiCfg *apiConfig) handlerPostChirp(w http.ResponseWriter, r *http.Request
 
 	createChirpParams := database.CreateChirpParams{
 		Body:   cleanedBody,
-		UserID: inputData.UserID,
+		UserID: validatedUserID,
 	}
 
 	chirp, err := apiCfg.dbQueries.CreateChirp(context.Background(), createChirpParams)
