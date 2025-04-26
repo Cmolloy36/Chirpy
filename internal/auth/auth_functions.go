@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -39,9 +41,11 @@ func CheckPasswordHash(hash, password string) error {
 	return nil
 }
 
-func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
+func MakeJWT(userID uuid.UUID, tokenSecret string) (string, error) {
 	currTime := time.Now()
 	currTimeJWT := jwt.NewNumericDate(currTime)
+
+	expiresIn := time.Duration(1) * time.Hour
 
 	expiresAt := currTime.Add(expiresIn)
 	expiresAtJWT := jwt.NewNumericDate(expiresAt)
@@ -97,7 +101,20 @@ func GetBearerToken(headers http.Header) (string, error) {
 	}
 
 	splitString := strings.Split(authHeader, "Bearer ")
-	TOKEN_STRING := splitString
+	if len(splitString) != 2 {
+		return "", fmt.Errorf("malformed authorization header")
+	}
 
-	return TOKEN_STRING[1], nil
+	return strings.TrimSpace(splitString[1]), nil
+}
+
+func MakeRefreshToken() (string, error) {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	tokenStr := hex.EncodeToString(b)
+
+	return tokenStr, nil
 }

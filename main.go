@@ -47,13 +47,23 @@ func main() {
 
 	newServeMux.HandleFunc("POST /api/chirps", apiCfg.handlerPostChirp)
 
+	newServeMux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.handlerDeleteChirp)
+
 	newServeMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerGetChirp)
 
 	newServeMux.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps)
 
 	newServeMux.HandleFunc("POST /api/login", apiCfg.handlerLogin)
 
+	newServeMux.HandleFunc("POST /api/polka/webhooks", apiCfg.handlerPostPolkaWebhook)
+
+	newServeMux.HandleFunc("POST /api/refresh", apiCfg.handlerRefresh)
+
+	newServeMux.HandleFunc("POST /api/revoke", apiCfg.handlerRevoke)
+
 	newServeMux.HandleFunc("POST /api/users", apiCfg.handlerPostUser)
+
+	newServeMux.HandleFunc("PUT /api/users", apiCfg.handlerPutUser)
 
 	newServeMux.HandleFunc("GET /api/users/{userID}", apiCfg.handlerGetUser)
 
@@ -73,11 +83,13 @@ type apiConfig struct {
 }
 
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
-	Token     string    `json:"token"`
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token,omitempty"`
+	RefreshToken string    `json:"refresh_token,omitempty"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
 }
 
 type Chirp struct {

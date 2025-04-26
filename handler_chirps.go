@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -11,72 +13,61 @@ import (
 	"github.com/google/uuid"
 )
 
-func (apiCfg *apiConfig) handlerPostChirp(w http.ResponseWriter, r *http.Request) {
-	type inputJSON struct {
-		Body string `json:"body"`
-	}
+func (apiCfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	chirpIDStr := r.PathValue("chirpID")
 
-	var inputData inputJSON
-
-	decoder := json.NewDecoder(r.Body)
-
-	defer r.Body.Close()
-
-	if err := decoder.Decode(&inputData); err != nil {
-		errorMessage := "Something went wrong"
+	chirpID, err := uuid.Parse(chirpIDStr)
+	if err != nil {
+		errorMessage := "Error parsing chirp ID"
 
 		respondWithError(w, http.StatusBadRequest, errorMessage)
 		return
 	}
 
-	token, err := auth.GetBearerToken(r.Header)
+	accessTokenString, err := auth.GetBearerToken(r.Header)
 	if err != nil {
+		errorMessage := err.Error()
+
+		respondWithError(w, http.StatusUnauthorized, errorMessage)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(accessTokenString, apiCfg.secretString)
+	if err != nil {
+		errorMessage := err.Error()
+
+		respondWithError(w, http.StatusUnauthorized, errorMessage)
+		return
+	}
+
+	chirp, err := apiCfg.dbQueries.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		errorMessage := err.Error()
+
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusNotFound, errorMessage)
+			return
+		}
+
+		respondWithError(w, http.StatusBadRequest, errorMessage)
+		return
+	}
+
+	if chirp.UserID != userID {
+		errorMessage := "not authorized to delete this Chirp"
+
+		respondWithError(w, http.StatusForbidden, errorMessage)
+		return
+	}
+
+	if err := apiCfg.dbQueries.DeleteChirp(r.Context(), chirpID); err != nil {
 		errorMessage := err.Error()
 
 		respondWithError(w, http.StatusBadRequest, errorMessage)
 		return
 	}
 
-	validatedUserID, err := auth.ValidateJWT(token, apiCfg.secretString)
-	if err != nil {
-		errorMessage := err.Error()
-
-		respondWithError(w, http.StatusBadRequest, errorMessage)
-		return
-	}
-
-	if len(inputData.Body) > 140 {
-
-		errorMessage := "Chirp is too long"
-
-		respondWithError(w, http.StatusBadRequest, errorMessage)
-		return
-	}
-
-	cleanedBody := removeProfanity(inputData.Body)
-
-	createChirpParams := database.CreateChirpParams{
-		Body:   cleanedBody,
-		UserID: validatedUserID,
-	}
-
-	chirp, err := apiCfg.dbQueries.CreateChirp(context.Background(), createChirpParams)
-	if err != nil {
-		errorMessage := "Error creating chirp"
-
-		respondWithError(w, http.StatusBadRequest, errorMessage)
-		return
-	}
-
-	retChirp := Chirp{
-		ID:        chirp.ID,
-		CreatedAt: chirp.CreatedAt,
-		UpdatedAt: chirp.UpdatedAt,
-		Body:      cleanedBody,
-		UserID:    chirp.UserID,
-	}
-
-	respondwithJSON(w, http.StatusCreated, retChirp)
+	respondwithJSON(w, http.StatusNoContent, nil)
 }
 
 func (apiCfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +83,12 @@ func (apiCfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request)
 
 	chirp, err := apiCfg.dbQueries.GetChirp(context.Background(), chirpID)
 	if err != nil {
-		errorMessage := "Error getting chirp"
+		errorMessage := err.Error()
+
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusNotFound, errorMessage)
+			return
+		}
 
 		respondWithError(w, http.StatusBadRequest, errorMessage)
 		return
@@ -131,6 +127,74 @@ func (apiCfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request
 	}
 
 	respondwithJSON(w, http.StatusOK, retSlc)
+}
+
+func (apiCfg *apiConfig) handlerPostChirp(w http.ResponseWriter, r *http.Request) {
+	type inputJSON struct {
+		Body string `json:"body"`
+	}
+
+	var inputData inputJSON
+
+	decoder := json.NewDecoder(r.Body)
+
+	defer r.Body.Close()
+
+	if err := decoder.Decode(&inputData); err != nil {
+		errorMessage := "Something went wrong"
+
+		respondWithError(w, http.StatusBadRequest, errorMessage)
+		return
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		errorMessage := err.Error()
+
+		respondWithError(w, http.StatusBadRequest, errorMessage)
+		return
+	}
+
+	validatedUserID, err := auth.ValidateJWT(token, apiCfg.secretString)
+	if err != nil {
+		errorMessage := err.Error()
+
+		respondWithError(w, http.StatusUnauthorized, errorMessage)
+		return
+	}
+
+	if len(inputData.Body) > 140 {
+
+		errorMessage := "Chirp is too long"
+
+		respondWithError(w, http.StatusBadRequest, errorMessage)
+		return
+	}
+
+	cleanedBody := removeProfanity(inputData.Body)
+
+	createChirpParams := database.CreateChirpParams{
+		Body:   cleanedBody,
+		UserID: validatedUserID,
+	}
+
+	chirp, err := apiCfg.dbQueries.CreateChirp(context.Background(), createChirpParams)
+	if err != nil {
+		errorMessage := "Error creating chirp"
+
+		respondWithError(w, http.StatusBadRequest, errorMessage)
+		return
+	}
+
+	retChirp := Chirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      cleanedBody,
+		UserID:    chirp.UserID,
+	}
+
+	respondwithJSON(w, http.StatusCreated, retChirp)
 }
 
 var profaneWords []string = []string{"kerfuffle", "sharbert", "fornax"}

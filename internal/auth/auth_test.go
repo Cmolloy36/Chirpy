@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -39,9 +38,8 @@ func TestHashFailure(t *testing.T) {
 func TestMakeJWT(t *testing.T) {
 	userId := uuid.New()
 	tokenSecret := os.Getenv("TOKEN_SECRET")
-	expiresIn, _ := time.ParseDuration("1s")
 
-	signedToken, err := MakeJWT(userId, tokenSecret, expiresIn)
+	signedToken, err := MakeJWT(userId, tokenSecret)
 	if err != nil {
 		t.Fatalf("error signing token: %v", err)
 	}
@@ -53,21 +51,16 @@ func TestMakeJWT(t *testing.T) {
 
 	assert.Equal(t, userId, userIdValidated)
 
-	time.Sleep(expiresIn)
-
 }
 
 func TestExpiredToken(t *testing.T) {
 	userId := uuid.New()
 	tokenSecret := os.Getenv("TOKEN_SECRET")
-	expiresIn, _ := time.ParseDuration("1s")
 
-	signedToken, err := MakeJWT(userId, tokenSecret, expiresIn)
+	signedToken, err := MakeJWT(userId, tokenSecret)
 	if err != nil {
 		t.Fatalf("error signing token: %v", err)
 	}
-
-	time.Sleep(expiresIn)
 
 	userIdValidated, err := ValidateJWT(signedToken, tokenSecret)
 	if !errors.Is(err, jwt.ErrTokenExpired) {
@@ -81,9 +74,8 @@ func TestInvalidSecret(t *testing.T) {
 	// Create a token with a specific secret
 	userId := uuid.New()
 	correctSecret := "correct-secret"
-	expiresIn, _ := time.ParseDuration("10s")
 
-	signedToken, err := MakeJWT(userId, correctSecret, expiresIn)
+	signedToken, err := MakeJWT(userId, correctSecret)
 	if err != nil {
 		t.Fatalf("error signing token: %v", err)
 	}
@@ -99,9 +91,8 @@ func TestInvalidSecret(t *testing.T) {
 func TestInvalidSecret2(t *testing.T) {
 	userId := uuid.New()
 	tokenSecret := "right_secret"
-	expiresIn, _ := time.ParseDuration("5s")
 
-	signedToken, err := MakeJWT(userId, tokenSecret, expiresIn)
+	signedToken, err := MakeJWT(userId, tokenSecret)
 	if err != nil {
 		t.Fatalf("error signing token: %v", err)
 	}
