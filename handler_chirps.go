@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/Cmolloy36/Chirpy/internal/auth"
@@ -105,22 +106,35 @@ func (apiCfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request)
 	respondwithJSON(w, http.StatusOK, retChirp)
 }
 
+// type SortParam int
+
+// // Define the enum values using iota
+// const (
+// 	Asc SortParam = iota // 0
+// 	Desc             // 1
+// )
+
 func (apiCfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
-	s := r.URL.Query().Get("author_id")
+	s1 := r.URL.Query().Get("author_id")
 	// s is a string that contains the value of the author_id query parameter
 	// if it exists, or an empty string if it doesn't
+	var err error
 
-	userID, err := uuid.Parse(s)
-	if err != nil {
-		errorMessage := err.Error()
+	var userID uuid.UUID
 
-		respondWithError(w, http.StatusBadRequest, errorMessage)
-		return
+	if s1 != "" {
+		userID, err = uuid.Parse(s1)
+		if err != nil {
+			errorMessage := err.Error()
+
+			respondWithError(w, http.StatusBadRequest, errorMessage)
+			return
+		}
 	}
 
 	var chirpSlc []database.Chirp
 
-	if s != "" {
+	if s1 != "" {
 		chirpSlc, err = apiCfg.dbQueries.GetChirpsForUser(context.Background(), userID)
 	} else {
 		chirpSlc, err = apiCfg.dbQueries.GetChirps(context.Background())
@@ -132,6 +146,29 @@ func (apiCfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request
 		respondWithError(w, http.StatusBadRequest, errorMessage)
 		return
 	}
+
+	sortParam := r.URL.Query().Get("sort")
+
+	type sortFunc func(i, j int) bool
+
+	var sortFuncUsed sortFunc
+
+	if sortParam == "desc" {
+		sortFuncUsed = func(i, j int) bool {
+			return chirpSlc[i].CreatedAt.After(chirpSlc[j].CreatedAt)
+		}
+	} else if sortParam == "asc" || sortParam == "" {
+		sortFuncUsed = func(i, j int) bool {
+			return chirpSlc[i].CreatedAt.Before(chirpSlc[j].CreatedAt)
+		}
+	} else {
+		errorMessage := "invalid sortfunc parameter"
+
+		respondWithError(w, http.StatusBadRequest, errorMessage)
+		return
+	}
+
+	sort.Slice(chirpSlc, sortFuncUsed)
 
 	retSlc := make([]Chirp, len(chirpSlc))
 
