@@ -38,6 +38,7 @@ func main() {
 	apiCfg.fileserverHits.Store(0)
 	apiCfg.dbQueries = dbQueries
 	apiCfg.secretString = os.Getenv("SIGNING_SECRET")
+	apiCfg.polkaKey = os.Getenv("POLKA_KEY")
 
 	funcHandler := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
 
@@ -80,6 +81,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32 // allows us to safely increment & read across multiple goroutines
 	dbQueries      *database.Queries
 	secretString   string
+	polkaKey       string
 }
 
 type User struct {

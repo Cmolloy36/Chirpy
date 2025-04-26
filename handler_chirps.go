@@ -106,7 +106,26 @@ func (apiCfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request)
 }
 
 func (apiCfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
-	chirpSlc, err := apiCfg.dbQueries.GetChirps(context.Background())
+	s := r.URL.Query().Get("author_id")
+	// s is a string that contains the value of the author_id query parameter
+	// if it exists, or an empty string if it doesn't
+
+	userID, err := uuid.Parse(s)
+	if err != nil {
+		errorMessage := err.Error()
+
+		respondWithError(w, http.StatusBadRequest, errorMessage)
+		return
+	}
+
+	var chirpSlc []database.Chirp
+
+	if s != "" {
+		chirpSlc, err = apiCfg.dbQueries.GetChirpsForUser(context.Background(), userID)
+	} else {
+		chirpSlc, err = apiCfg.dbQueries.GetChirps(context.Background())
+	}
+
 	if err != nil {
 		errorMessage := "Error getting chirps"
 

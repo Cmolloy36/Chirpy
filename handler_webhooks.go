@@ -6,10 +6,26 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Cmolloy36/Chirpy/internal/auth"
 	"github.com/google/uuid"
 )
 
 func (apiCfg *apiConfig) handlerPostPolkaWebhook(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		errorMessage := err.Error()
+
+		respondWithError(w, http.StatusUnauthorized, errorMessage)
+		return
+	}
+
+	if apiKey != apiCfg.polkaKey {
+		errorMessage := "incorrect API Key"
+
+		respondWithError(w, http.StatusUnauthorized, errorMessage)
+		return
+	}
+
 	type inputJSON struct {
 		Event string `json:"event,omitempty"`
 		Data  struct {
